@@ -1,0 +1,17 @@
+# Face embeddings (biometric data) and processed photos — never commit these
+data/
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+# Kilo agent config
+.kilo/

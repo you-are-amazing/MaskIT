@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MaskIT · Face anonymizer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <img src="/logo.png" alt="MaskIT logo" class="brand-logo">
+  </div>
+  <span class="grow"></span>
+  <span class="pill ok"><i class="dot"></i>Runs on your machine · photos are never uploaded to a cloud</span>
+  <button id="exportBtn" class="btn solid" disabled>Export all (.zip)</button>
+</header>
+
+<div class="layout">
+<aside class="side">
+  <section class="card">
+    <div class="between"><h3 class="caps hd"><i class="hdot"></i>Face recognition memory</h3><span id="count" class="chip mono">0 Enrolled</span></div>
+    <p class="muted">Teach the app a face to selectively hide or keep that person in group shots.</p>
+    <label class="caps sm" for="enrollName">Identity label</label>
+    <input id="enrollName" class="input" type="text" maxlength="40" placeholder="e.g. Rahul / Self / VIP" autocomplete="off">
+    <div class="two">
+      <button id="camBtn" class="btn ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="6" width="13" height="12" rx="2.5"/><path d="M15.5 10.5 21 7.5v9l-5.500-3z"/></svg>Live webcam</button>
+      <label class="btn ic" tabindex="0" id="sampleLbl"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0L7.500 8.500M12 4l4.500 4.500"/><path d="M4 15v3.500A1.500 1.500 0 0 0 5.500 20h13a1.500 1.500 0 0 0 1.500-1.500V15"/></svg>Upload sample<input id="sampleInput" type="file" accept="image/*" hidden></label>
+    </div>
+    <div id="guide" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="guideT">
+      <div class="gbox">
+        <button id="guideX" class="x gx" aria-label="Close guide">×</button>
+        <span class="gtag">Quick guide</span>
+        <h3 id="guideT">Teach MaskIT a face, then use it</h3>
+        <p class="muted">Enrolling lets MaskIT recognise one person across your group photos. Here is how it works:</p>
+        <ol class="gsteps">
+          <li><i>1</i><div><b>Enrol the person</b><span>Type a label, then use <em>Live webcam</em> or <em>Upload sample</em>. Use a clear, front-facing photo with only that one person in it.</span></div></li>
+          <li><i>2</i><div><b>Mark them as selected</b><span>Their card appears under Face recognition memory. Click it until it shows a green <span class="gsel">Selected</span> tag.</span></div></li>
+          <li><i>3</i><div><b>Choose “Everyone except selected”</b><span>Under Detection target scope, pick it. Everyone <u>else</u> gets masked and the selected person stays visible.</span></div></li>
+          <li><i>4</i><div><b>Press Anonymize</b><span>Add your group photo and press <em>Anonymize active image</em>.</span></div></li>
+        </ol>
+        <label class="check gskip"><input id="guideSkip" type="checkbox">Don’t show this guide again</label>
+        <div class="gact"><button id="guideNo" class="btn">Cancel</button><button id="guideOk" class="btn solid">Got it, continue</button></div>
+      </div>
+    </div>
+    <div id="cam" class="modal hidden" role="dialog" aria-modal="true" aria-label="Capture face">
+      <div class="mbox">
+        <div class="between"><h3>Capture your face</h3><button id="camX" class="x" aria-label="Close camera">×</button></div>
+        <div class="vwrap"><video id="webcam" autoplay playsinline muted></video><div class="oval"></div><div id="dots" class="dots"></div></div>
+        <p id="camMsg" class="muted">Centre your face in the oval, then press Capture.</p>
+        <button id="capBtn" class="btn solid big">Capture 5 frames</button>
+      </div>
+    </div>
+    <ul id="people" class="people"></ul>
+    <p id="noPeople" class="muted it">No one enrolled yet.</p>
+    <button id="clearBtn" class="link hidden">Delete all enrolled faces</button>
+  </section>
+
+  <section class="grp">
+    <div class="between"><h3 class="caps">Detection target scope</h3><span class="muted tiny">who gets hidden</span></div>
+    <div id="target" class="grid2 opts">
+      <label><input type="radio" name="target" value="all" checked><span>Everyone</span></label>
+      <label><input type="radio" name="target" value="person"><span>Only selected people</span></label>
+      <label><input type="radio" name="target" value="male"><span>Men</span></label>
+      <label><input type="radio" name="target" value="female"><span>Women</span></label>
+      <label><input type="radio" name="target" value="except_person"><span>Everyone except selected</span></label>
+    </div>
+    <p class="note"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.500"/><path d="M12 11v5.500M12 7.600v.1"/></svg><span>Age and gender are model estimates and can be wrong. For <b>“Only selected people”</b>, click face boxes on your photo, then press Anonymize. For <b>“Everyone except selected”</b>, click enrolled people above.</span></p>
+  </section>
+
+  <section class="grp">
+    <div class="between"><h3 class="caps">Masking style</h3></div>
+    <div class="grid3 opts tiles">
+      <label><input type="radio" name="effect" value="blur" checked><span><em class="t-blur"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.500c3.500 4.200 6 7.200 6 10.500a6 6 0 0 1-12 0c0-3.300 2.500-6.300 6-10.500z" fill="currentColor"/></svg></em><b>Gaussian</b><small>Smooth blur</small></span></label>
+      <label><input type="radio" name="effect" value="pixelate"><span><em class="t-pixelate"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2.500" fill="none" stroke="currentColor" stroke-width="1.800"/><path d="M12 4v16M4 12h16" stroke="currentColor" stroke-width="1.800"/></svg></em><b>Pixelate</b><small>Retro grid</small></span></label>
+      <label><input type="radio" name="effect" value="blackout"><span><em class="t-blackout"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="3" fill="currentColor"/></svg></em><b>Dark box</b><small>High censor</small></span></label>
+      <label><input type="radio" name="effect" value="emoji"><span><em class="t-emoji">😎</em><b>Cool emoji</b><small>Playful</small></span></label>
+      <label><input type="radio" name="effect" value="hearts"><span><em class="t-hearts">❤️</em><b>Hearts</b><small>Sweet cover</small></span></label>
+      <label><input type="radio" name="effect" value="glitch"><span><em class="t-glitch">///</em><b>Cyber glitch</b><small>Digital noise</small></span></label>
+    </div>
+  </section>
+
+  <section class="sliders">
+    <label><span class="between">Mask intensity <b id="intV">85%</b></span><input id="intensity" type="range" min="10" max="100" value="85"></label>
+    <label><span class="between">Boundary margin <b id="marV">+18%</b></span><input id="margin" type="range" min="0" max="50" value="18"></label>
+    <label class="check"><input id="feather" type="checkbox" checked>Soft feathered edge</label>
+    <label class="check"><input type="checkbox" checked disabled>Scrub EXIF &amp; GPS metadata (always on)</label>
+  </section>
+</aside>
+
+<main>
+  <div class="bar">
+    <b id="fname" class="mono">No image</b><span id="dims" class="chip mono hidden"></span><span id="found" class="pill ok hidden"></span>
+    <button id="rmBtn" class="btn sm rm hidden" title="Remove this photo" aria-label="Remove this photo">× Remove photo</button>
+    <span class="grow"></span>
+    <span class="zoom"><button id="zOut" class="x" aria-label="Zoom out">−</button><b id="zV" class="mono">100%</b><button id="zIn" class="x" aria-label="Zoom in">+</button></span>
+    <button id="zReset" class="btn sm">Reset view</button>
+    <button id="splitBtn" class="btn sm" disabled>Compare</button>
+    <button id="editBtn" class="btn sm" disabled>Edit faces</button>
+  </div>
+
+  <div class="stagewrap">
+  <button id="stageX" class="stagex hidden" title="Remove this photo" aria-label="Remove this photo">×</button>
+  <div id="stage" class="stage">
+    <label id="drop" class="drop" tabindex="0"><input id="photoInput" type="file" accept="image/*" multiple hidden>
+      <div class="fog" aria-hidden="true">
+        <iframe src="https://my.spline.design/serenityinsymmetry-dbX7kaVDRrzDSyBdrMUeFWIY/" title="Interactive 3D background" loading="lazy" tabindex="-1"></iframe>
+        <div class="fogfade"></div>
+      </div>
+      <div class="dropmini"><strong>Drop photos here</strong><span>or click to browse · JPG, PNG, WebP up to 15 MB each</span></div></label>
+    <div id="frame" class="frame hidden"><img id="img" alt="Photo" draggable="false"><img id="orig" class="hidden" alt="Original" draggable="false"><div id="boxes" class="hidden"></div><div id="scanLine" class="scanline hidden"></div><div id="divider" class="divider hidden"><i>⇆</i></div><span id="tagO" class="ftag l hidden">Original</span><span id="tagM" class="ftag r hidden">MaskIT</span></div>
+    <input id="splitR" class="split hidden" type="range" min="0" max="100" value="50" aria-label="Split position">
+    <div id="wait" class="wait hidden" role="status" aria-live="polite"><div class="wcard"><div class="ring"></div><b id="waitTitle">Scanning faces…</b><span id="waitMsg" class="mono muted sm"></span></div></div>
+    <div id="hint" class="floatbar hidden">Click a face box to hide or keep it, then press “Apply to selected”.</div>
+  </div>
+  </div>
+  <div class="actions">
+    <input id="conf" type="hidden" value="50">
+    <button id="goBtn" class="btn solid" disabled>Anonymize active image</button>
+    <span class="grow"></span>
+    <button id="copyBtn" class="btn" disabled>Copy to clipboard</button>
+    <a id="dlBtn" class="btn solid disabled" download="masked.jpg">Download masked photo</a>
+  </div>
+  <p id="toast" class="toast" role="status" aria-live="polite"></p>
+
+  <label id="more" class="more hidden" tabindex="0"><input id="moreInput" type="file" accept="image/*" multiple hidden>
+    <span><b>Drop more images to batch anonymize</b><br><small class="muted">Each image keeps its own result. Export all downloads a zip.</small></span><span class="btn">Browse files</span></label>
+  <p class="muted sm legal">Faces are biometric data. Process only photos of yourself or people who agreed.</p>
+</main>
+</div>
+
+<footer class="queue"><span class="caps muted">Queue <span id="qN">(0)</span></span><div id="q" class="qlist"></div>
+  <span class="grow"></span><span class="mono muted sm">Biometric safety: <b class="okc">local only</b></span></footer>
+<script src="app.js"></script>
+</body>
+</html>
