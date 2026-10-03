@@ -16,9 +16,10 @@ MAX_SIDE = 2560          # larger photos are downscaled (bounds memory + time)
 OUTPUT_TTL_SECONDS = 3600  # processed images are deleted after this
 SESSION_COOKIE = "maskit_sid"
 SESSION_TTL_SECONDS = 60 * 60 * 24 * 30  # a visitor's enrolled faces stay for 30 days
-# Only mark the cookie Secure when the site is actually served over HTTPS, else
-# the browser drops it on plain-HTTP/IP access (which is how it runs locally).
-SESSION_COOKIE_SECURE = os.environ.get("MASKIT_SECURE_COOKIES", "1") == "1"
+# Force the Secure flag on/off regardless of scheme. Left unset, the cookie is
+# marked Secure only on HTTPS requests, so the app works both on a plain-HTTP
+# port and behind a TLS proxy instead of silently losing sessions.
+SESSION_COOKIE_SECURE = os.environ.get("MASKIT_SECURE_COOKIES", "auto").lower()
 
 
 def load_secret() -> bytes:

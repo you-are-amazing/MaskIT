@@ -69,9 +69,16 @@ def session_of(request: Request) -> str:
     return get_session(request)
 
 
-def set_session_cookie(response, sid: str):
+def set_session_cookie(response, sid: str, request: Request | None = None):
+    # Mark the cookie Secure only when this request actually arrived over HTTPS,
+    # so plain-HTTP access (a bare IP, localhost) keeps working instead of the
+    # browser dropping the cookie. A TLS proxy in front sets X-Forwarded-Proto.
+    secure = SESSION_COOKIE_SECURE
+    if secure == "auto":
+        proto = request.headers.get("x-forwarded-proto", request.url.scheme if request else "http")
+        secure = proto == "https"
     response.set_cookie(SESSION_COOKIE, f"{sid}.{_sign(sid)}", max_age=SESSION_TTL_SECONDS,
-                        httponly=True, samesite="lax", secure=SESSION_COOKIE_SECURE)
+                        httponly=True, samesite="lax", secure=(secure == "1" or secure is True))
     return response
 
 
@@ -100,7 +107,7 @@ def cleanup_outputs():
 def enroll(request: Request, name: str = Form(...), files: list[UploadFile] = File(...)):
     name = name.strip()
     if not NAME_RE.match(name):
-        return set_session_cookie(err("Use a name of 1–40 letters, numbers, spaces or . ' -"), get_session(request))
+        return set_session_cookie(err("Use a name of 1–40 letters, numbers, spaces or . ' -"), get_session(request), request)
     engine, embs = get_engine(), []
     for f in files:
         try:
@@ -112,37 +119,37 @@ def enroll(request: Request, name: str = Form(...), files: list[UploadFile] = Fi
             embs.append(max(faces, key=lambda x: (x.bbox[2] - x.bbox[0]) * (x.bbox[3] - x.bbox[1])).normed_embedding)
     need = min(3, len(files))
     if len(embs) < need:
-        return set_session_cookie(err(f"Only {len(embs)} usable frame(s). Face the camera in good light and try again."), get_session(request))
+        return set_session_cookie(err(f"Only {len(embs)} usable frame(s). Face the camera in good light and try again."), get_session(request), request)
     mean = np.mean(embs, axis=0)
     keep = [e for e in embs if engine.cosine(e, mean) >= 0.5]  # drop frames where someone else walked in
     if len(keep) < need:
-        return set_session_cookie(err("The frames showed different people. Make sure only you are in view."), get_session(request))
+        return set_session_cookie(err("The frames showed different people. Make sure only you are in view."), get_session(request), request)
     mean = np.mean(keep, axis=0)
     sid = get_session(request)
     save_person(sid, name, mean / np.linalg.norm(mean))
-    return set_session_cookie(JSONResponse({"status": "ok", "person": name, "frames_used": len(keep)}), sid)
+    return set_session_cookie(JSONResponse({"status": "ok", "person": name, "frames_used": len(keep)}), sid, request)
 
 
 @app.get("/api/persons")
 def persons(request: Request):
     sid = get_session(request)
-    return set_session_cookie(JSONResponse({"persons": list(load_persons(sid).keys())}), sid)
+    return set_session_cookie(JSONResponse({"persons": list(load_persons(sid).keys())}), sid, request)
 
 
 @app.delete("/api/persons")
 def remove_all(request: Request):
     sid = get_session(request)
     delete_all(sid)
-    return set_session_cookie(JSONResponse({"status": "ok"}), sid)
+    return set_session_cookie(JSONResponse({"status": "ok"}), sid, request)
 
 
 @app.delete("/api/persons/{name}")
 def remove_person(request: Request, name: str):
     sid = get_session(request)
     if name not in load_persons(sid):  # don't claim a delete that touched nothing (e.g. another session's name)
-        return set_session_cookie(err("No such person in your list.", 404), sid)
+        return set_session_cookie(err("No such person in your list.", 404), sid, request)
     delete_person(sid, name)
-    return set_session_cookie(JSONResponse({"status": "ok", "removed": name}), sid)
+    return set_session_cookie(JSONResponse({"status": "ok", "removed": name}), sid, request)
 
 
 @app.post("/api/process")
@@ -159,22 +166,22 @@ def process(
     min_conf: int = Form(50),
 ):
     if effect not in effects.APPLY:
-        return set_session_cookie(err(f"effect must be one of {sorted(effects.APPLY)}"), get_session(request))
+        return set_session_cookie(err(f"effect must be one of {sorted(effects.APPLY)}"), get_session(request), request)
     if target not in TARGETS:
-        return set_session_cookie(err(f"target must be one of {sorted(TARGETS)}"), get_session(request))
+        return set_session_cookie(err(f"target must be one of {sorted(TARGETS)}"), get_session(request), request)
     sid = get_session(request)
     try:
         raw = file.file.read()
         pil, bgr = load_image(raw)
         manual = set(json.loads(override)) if override else None
     except (ValueError, TypeError) as e:
-        return set_session_cookie(err(str(e)), sid)
+        return set_session_cookie(err(str(e)), sid, request)
 
     db = load_persons(sid) if target in ("person", "except_person") else {}
     if db and not db.keys() & set(persons or db):
-        return set_session_cookie(err("Pick at least one enrolled person"), sid)
+        return set_session_cookie(err("Pick at least one enrolled person"), sid, request)
     if target in ("person", "except_person") and not db:
-        return set_session_cookie(err("Enroll a person first"), sid)
+        return set_session_cookie(err("Enroll a person first"), sid, request)
     chosen = set(persons) & db.keys() or set(db)
 
     engine = get_engine()
@@ -207,7 +214,7 @@ def process(
     fname = f"{hashlib.sha1(sid.encode()).hexdigest()[:12]}_{uuid.uuid4().hex}.jpg"
     pil.save(os.path.join(OUTPUT_DIR, fname), format="JPEG", quality=92)
     return set_session_cookie(JSONResponse({"image": f"/api/result/{fname}", "width": pil.width, "height": pil.height,
-            "ms": int((time.time() - t0) * 1000), "faces_found": len(faces), "faces_hidden": hidden, "faces": report}), sid)
+            "ms": int((time.time() - t0) * 1000), "faces_found": len(faces), "faces_hidden": hidden, "faces": report}), sid, request)
 
 
 @app.get("/api/result/{fname}")
