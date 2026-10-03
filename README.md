@@ -1,12 +1,21 @@
-# MaskIT
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="backend/static/logo-inverted.png">
+    <img src="backend/static/logo.png" alt="MaskIT" width="420">
+  </picture>
+</p>
 
-A local-first face anonymizer. Teach it your face once via webcam, then hide
-yourself — and only yourself — in any photo. Also hides everyone, everyone
-except you, or people filtered by estimated age and gender.
+<p align="center"><strong>A local-first face anonymizer.</strong><br>
+Teach it your face once via webcam, then hide yourself — and only yourself —
+in any photo. Also hides everyone, everyone except you, or people filtered by
+estimated age and gender.<br><br>
+Runs entirely on your own machine. No uploads, no cloud, no account.</p>
 
-Runs entirely on your own machine. No uploads, no cloud, no account.
-
-![Python](https://img.shields.io/badge/python-3.10%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green) ![Frontend](https://img.shields.io/badge/frontend-vanilla%20JS-orange)
+<p align="center">
+  <img src="https://img.shields.io/badge/python-3.10%2B-blue" alt="Python 3.10+">
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License">
+  <img src="https://img.shields.io/badge/frontend-vanilla%20JS-orange" alt="Vanilla JS">
+</p>
 
 ## Why this is more than a blur filter
 
