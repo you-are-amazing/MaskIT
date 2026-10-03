@@ -1,14 +1,10 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="backend/static/logo-inverted.png">
-    <img src="backend/static/logo.png" alt="MaskIT" width="420">
-  </picture>
+  <img src="backend/static/readme-banner.jpg" alt="MaskIT">
 </p>
 
 <p align="center"><strong>A local-first face anonymizer.</strong><br>
-Teach it your face once via webcam, then hide yourself — and only yourself —
-in any photo. Also hides everyone, everyone except you, or people filtered by
-estimated age and gender.<br><br>
+Teach it your face once via webcam, then hide yourself, and only yourself, in any photo.
+Also hides everyone, everyone except you, or people filtered by estimated age and gender.<br><br>
 Runs entirely on your own machine. No uploads, no cloud, no account.</p>
 
 <p align="center">
@@ -21,7 +17,7 @@ Runs entirely on your own machine. No uploads, no cloud, no account.</p>
 
 Most face blur tools detect *a* face and hide it. MaskIT identifies *whose* face
 it found, using ArcFace embeddings, so it can answer questions like "hide my
-face but keep everyone else" — in group photos, where that actually matters.
+face but keep everyone else", in group photos where that actually matters.
 
 | Capability | How |
 |---|---|
@@ -31,13 +27,13 @@ face but keep everyone else" — in group photos, where that actually matters.
 
 ## Features
 
-- **Webcam enrollment** — 5 frames → one averaged, normalised embedding. No model training.
-- **Six scopes** — everyone · only selected people · everyone *except* selected · kids (≤17) · women · men.
-- **Six effects** — Gaussian blur · pixelate · dark box · cyber glitch · cool emoji · hearts.
-- **Manual override** — click any detected face box to keep or hide it, ignoring the automatic rule.
-- **Live tuning** — intensity, boundary margin, feathered edges and detection confidence re-render instantly.
-- **Split compare** — wipe between original and masked.
-- **Batch queue** — drop multiple photos, export as `.zip`.
+- **Webcam enrollment**: 5 frames → one averaged, normalised embedding. No model training.
+- **Six scopes**: everyone · only selected people · everyone *except* selected · kids (≤17) · women · men.
+- **Six effects**: Gaussian blur · pixelate · dark box · cyber glitch · cool emoji · hearts.
+- **Manual override**: click any detected face box to keep or hide it, ignoring the automatic rule.
+- **Live tuning**: intensity, boundary margin, feathered edges and detection confidence re-render instantly.
+- **Split compare**: wipe between original and masked.
+- **Batch queue**: drop multiple photos, export as `.zip`.
 - **EXIF stripped** on every processed image, including GPS.
 
 ## Tech
@@ -45,7 +41,7 @@ face but keep everyone else" — in group photos, where that actually matters.
 | Layer | Choice |
 |---|---|
 | Backend | FastAPI, InsightFace (`buffalo_l`), ONNX Runtime |
-| Database | SQLite — face embeddings only, stored locally |
+| Database | SQLite, face embeddings only, stored locally |
 | Frontend | Vanilla HTML/CSS/JS, webcam via `getUserMedia` |
 | Dependencies | 7 packages |
 
@@ -103,11 +99,11 @@ visitor doesn't wait on a download.
 Face data is biometric data, so the access model matters as much as the model.
 
 - **Photos are never written to disk.** Decoded in memory, rendered, returned. Processed results are deleted after 1 hour.
-- **Enrolled faces are per-visitor**, keyed by a signed session cookie (`HttpOnly`, `SameSite=Lax`). Two people on the same URL do not share a face database — deleting your cookie revokes your access.
+- **Enrolled faces are per-visitor**, keyed by a signed session cookie (`HttpOnly`, `SameSite=Lax`). Two people on the same URL do not share a face database; deleting your cookie revokes your access.
 - **Result images are session-bound**, so one visitor cannot fetch another's processed photos by guessing a filename.
 - **Signing keys are never in the repo.** `data/` is git-ignored; `data/session_secret` is generated on first run at `0600`.
 - **No account system.** Isolation stops people reading *each other's* faces, but anyone who can reach the URL can still enroll faces and process photos. Add auth before exposing it publicly.
-- Face embeddings are biometric data under GDPR and similar laws — process only photos of yourself or people who consented.
+- Face embeddings are biometric data under GDPR and similar laws: process only photos of yourself or people who consented.
 
 ## Design notes
 
@@ -115,14 +111,14 @@ Some decisions worth recording:
 
 - **Per-face identity is enforced server-side.** The client sends a name list, but the query is scoped to the session, so a hand-crafted request can't read another person's embeddings.
 - **`Secure` is derived from the request scheme**, not hardcoded. Defaulting it on meant a first visit over plain HTTP silently lost its cookie and faces appeared not to save.
-- **Enrollment rejects mixed frames.** Averaged embeddings are recomputed against outliers and discarded if the frames showed different people — a stranger walking past shouldn't poison your face.
+- **Enrollment rejects mixed frames.** Averaged embeddings are recomputed against outliers and discarded if the frames showed different people, since a stranger walking past shouldn't poison your face.
 - **Manual selection beats the rules.** Clicking a box sets an explicit index list that overrides gender/age/person matching.
 - **Detection cache** (`_CACHE`, last 4 photos) makes slider tweaks re-render without re-running inference.
 
 Tunable in `backend/config.py`:
-- `MATCH_THRESHOLD` (0.45) — raise if the wrong person gets hidden, lower if yours is missed.
-- `DET_SIZE` — try `(1280, 1280)` for very large group photos.
-- `MIN_DET_SCORE` — how confident enrollment must be.
+- `MATCH_THRESHOLD` (0.45): raise if the wrong person gets hidden, lower if yours is missed.
+- `DET_SIZE`: try `(1280, 1280)` for very large group photos.
+- `MIN_DET_SCORE`: how confident enrollment must be.
 
 For GPU, install a CUDA build of ONNX Runtime.
 
@@ -140,14 +136,14 @@ maskit/
 │   ├── database.py     # SQLite, scoped per session
 │   ├── config.py       # thresholds, paths, cookie + secret config
 │   └── static/         # frontend (index.html, app.js, style.css, logo.png)
-├── data/               # face DB + outputs — git-ignored, never committed
+├── data/               # face DB + outputs, git-ignored, never committed
 ├── Dockerfile
 └── requirements.txt
 ```
 
 ## License
 
-Source code: **MIT** — see [LICENSE](LICENSE).
+Source code: **MIT**. See [LICENSE](LICENSE).
 
 ⚠️ **The model is not MIT.** MaskIT uses the InsightFace `buffalo_l` model pack,
 which upstream releases for **non-commercial research purposes only**. Commercial
@@ -160,5 +156,5 @@ ONNX Runtime, InsightFace).
 ## Legal
 
 Blur your own face, or get consent from people whose faces you process. Face data
-is biometric data under laws like GDPR — this is a tool, and using it on someone
+is biometric data under laws like GDPR. This is a tool, and using it on someone
 without their agreement may be unlawful where they live.
