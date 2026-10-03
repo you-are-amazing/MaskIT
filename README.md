@@ -1,85 +1,155 @@
 # MaskIT
 
-Privacy web app: learn a face from your webcam, then blur / pixelate / sticker
-faces in any uploaded photo — everyone, one specific person, males, females,
-or kids only.
+A local-first face anonymizer. Teach it your face once via webcam, then hide
+yourself — and only yourself — in any photo. Also hides everyone, everyone
+except you, or people filtered by estimated age and gender.
+
+Runs entirely on your own machine. No uploads, no cloud, no account.
+
+![Python](https://img.shields.io/badge/python-3.10%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green) ![Frontend](https://img.shields.io/badge/frontend-vanilla%20JS-orange)
+
+## Why this is more than a blur filter
+
+Most face blur tools detect *a* face and hide it. MaskIT identifies *whose* face
+it found, using ArcFace embeddings, so it can answer questions like "hide my
+face but keep everyone else" — in group photos, where that actually matters.
+
+| Capability | How |
+|---|---|
+| Find every face | RetinaFace detection |
+| Recognise **who** it is | ArcFace 512-d embeddings, cosine match |
+| Estimate age / gender | InsightFace `genderage` head |
 
 ## Features
-- **Webcam enrollment** — captures 5 frames, stores a face "embedding" (no model training needed)
-- **Blur everyone** / **females only** / **males only** / **kids only** (age ≤ 17)
-- **Find & hide one person** in a photo, even in group photos (face recognition)
-- **Effects**: blur, pixelate, black box, emoji, hearts
-- Per-face report: estimated age, gender, match info
+
+- **Webcam enrollment** — 5 frames → one averaged, normalised embedding. No model training.
+- **Six scopes** — everyone · only selected people · everyone *except* selected · kids (≤17) · women · men.
+- **Six effects** — Gaussian blur · pixelate · dark box · cyber glitch · cool emoji · hearts.
+- **Manual override** — click any detected face box to keep or hide it, ignoring the automatic rule.
+- **Live tuning** — intensity, boundary margin, feathered edges and detection confidence re-render instantly.
+- **Split compare** — wipe between original and masked.
+- **Batch queue** — drop multiple photos, export as `.zip`.
+- **EXIF stripped** on every processed image, including GPS.
 
 ## Tech
-- **Backend**: FastAPI + InsightFace (RetinaFace detection, ArcFace recognition, age/gender)
-- **DB**: SQLite (face embeddings stored locally)
-- **Frontend**: vanilla HTML/JS, webcam via `getUserMedia`
+
+| Layer | Choice |
+|---|---|
+| Backend | FastAPI, InsightFace (`buffalo_l`), ONNX Runtime |
+| Database | SQLite — face embeddings only, stored locally |
+| Frontend | Vanilla HTML/CSS/JS, webcam via `getUserMedia` |
+| Dependencies | 7 packages |
+
+## Performance
+
+Measured on 8 vCPU (x86, no GPU) with a 1200×900 photo:
+
+| | Time |
+|---|---|
+| Model load (once) | 5.0 s |
+| First inference | 573–908 ms |
+| Warm inference | **73–166 ms** |
+| Peak RAM | **854 MB** |
+
+CPU-only, no GPU required. Roughly 6–13 photos/second warm.
 
 ## Setup
-1. Python 3.10+ recommended
-   ```
-   pip install -r requirements.txt
-   ```
-   (First run auto-downloads the ~300 MB `buffalo_l` model pack.)
-2. Run the server from the project root:
-   ```
-   uvicorn backend.main:app --host 0.0.0.0 --port 8000
-   ```
-3. Open **http://localhost:8000** in your browser
-   (the webcam requires `localhost` or HTTPS).
 
-   Running over plain HTTP on a LAN IP? Set `MASKIT_SECURE_COOKIES=0`,
-   otherwise the browser drops the session cookie and each request looks
-   like a brand-new visitor (so face memories vanish between clicks).
+```bash
+pip install -r requirements.txt
+uvicorn backend.main:app --host 127.0.0.1 --port 8000
+```
 
-## Privacy model
-- Photos are processed in memory on the server running the app and are never
-  written to disk. Processed results are deleted after 1 hour.
-- Enrolled faces are **per-visitor**, stored under a signed session cookie
-  (`HttpOnly`, `SameSite=Lax`), so people sharing the URL don't share a face
-  database. Deleting your browser cookie removes your access to them.
-- There is **no account or password**. Anyone who can reach the URL can enroll
-  faces and process photos. Don't put it on a public IP you care about without
-  adding auth in front.
-- Face embeddings are biometric data — get consent, and check your local law.
+Then open **http://localhost:8000**.
 
-## How to use
-1. Enter a name → **Start camera** → **Capture & learn** (5 frames).
-2. Upload a photo, pick an **Effect** and **Who**, click **Process**.
-3. Download the result.
+The first enrollment or photo auto-downloads the 282 MB `buffalo_l` model pack,
+so the very first request takes a few seconds.
 
-## Notes / tuning
-- `MATCH_THRESHOLD` in `backend/config.py` — raise it if wrong people get blurred,
-  lower it if the enrolled person is missed.
-- `DET_SIZE` — try `(1280, 1280)` for very large group photos with small faces.
-- For GPU, install a CUDA build of PyTorch/ONNXRuntime first for big speedups.
-- Emoji mode needs a color-emoji font (NotoColorEmoji / Segoe UI Emoji /
-  Apple Color Emoji); otherwise it gracefully draws hearts.
+> **Use `localhost`, not your LAN IP.** The webcam uses `getUserMedia`, which
+> browsers only permit on `localhost` or HTTPS. On a plain-HTTP LAN address the
+> camera silently fails.
+>
+> If you *do* run on a LAN IP, set `MASKIT_SECURE_COOKIES=0`, or the browser
+> drops the session cookie and every request looks like a new visitor.
 
-## License
-Source code: **MIT** — see [LICENSE](LICENSE).
+### Docker
 
-⚠️ **The model is not MIT.** MaskIT auto-downloads the InsightFace `buffalo_l`
-model pack, which upstream releases for **non-commercial research purposes
-only**. Commercial use of that model requires a separate license from
-InsightFace. Swap in your own model in `backend/face_engine.py` to avoid this.
+```bash
+docker build -t maskit .
+docker run -d -p 8000:8000 maskit
+```
 
-## Legal / ethics
-Blur your own face or get consent from people whose faces you process.
-Face data is biometric data under laws like GDPR.
+The model is baked into the image at build time (~3 GB image), so the first
+visitor doesn't wait on a download.
+
+## Using it
+
+1. Enter a name → **Live webcam** → **Capture 5 frames**.
+2. Drop in a photo, choose a **Scope** and **Effect**, click **Anonymize**.
+3. Click any face box to override the rule, then **Apply to selected**.
+4. **Download** or **Copy to clipboard**.
+
+## Privacy design
+
+Face data is biometric data, so the access model matters as much as the model.
+
+- **Photos are never written to disk.** Decoded in memory, rendered, returned. Processed results are deleted after 1 hour.
+- **Enrolled faces are per-visitor**, keyed by a signed session cookie (`HttpOnly`, `SameSite=Lax`). Two people on the same URL do not share a face database — deleting your cookie revokes your access.
+- **Result images are session-bound**, so one visitor cannot fetch another's processed photos by guessing a filename.
+- **Signing keys are never in the repo.** `data/` is git-ignored; `data/session_secret` is generated on first run at `0600`.
+- **No account system.** Isolation stops people reading *each other's* faces, but anyone who can reach the URL can still enroll faces and process photos. Add auth before exposing it publicly.
+- Face embeddings are biometric data under GDPR and similar laws — process only photos of yourself or people who consented.
+
+## Design notes
+
+Some decisions worth recording:
+
+- **Per-face identity is enforced server-side.** The client sends a name list, but the query is scoped to the session, so a hand-crafted request can't read another person's embeddings.
+- **`Secure` is derived from the request scheme**, not hardcoded. Defaulting it on meant a first visit over plain HTTP silently lost its cookie and faces appeared not to save.
+- **Enrollment rejects mixed frames.** Averaged embeddings are recomputed against outliers and discarded if the frames showed different people — a stranger walking past shouldn't poison your face.
+- **Manual selection beats the rules.** Clicking a box sets an explicit index list that overrides gender/age/person matching.
+- **Detection cache** (`_CACHE`, last 4 photos) makes slider tweaks re-render without re-running inference.
+
+Tunable in `backend/config.py`:
+- `MATCH_THRESHOLD` (0.45) — raise if the wrong person gets hidden, lower if yours is missed.
+- `DET_SIZE` — try `(1280, 1280)` for very large group photos.
+- `MIN_DET_SCORE` — how confident enrollment must be.
+
+For GPU, install a CUDA build of ONNX Runtime.
+
+> **Emoji mode** needs a colour-emoji font (Noto Color Emoji / Segoe UI Emoji /
+> Apple Color Emoji); without one it falls back to hearts.
 
 ## Project layout
+
 ```
 maskit/
 ├── backend/
-│   ├── main.py        # FastAPI routes
-│   ├── face_engine.py # InsightFace wrapper (detect / embed / match)
-│   ├── effects.py     # blur, pixelate, emoji, hearts
-│   ├── database.py    # SQLite embeddings
-│   ├── config.py      # thresholds & paths
-│   └── static/        # frontend
-├── data/              # face DB + processed photos (git-ignored)
-├── requirements.txt
-└── README.md
+│   ├── main.py         # FastAPI routes, session handling
+│   ├── face_engine.py  # InsightFace wrapper: detect / embed / match
+│   ├── effects.py      # 6 masking effects
+│   ├── database.py     # SQLite, scoped per session
+│   ├── config.py       # thresholds, paths, cookie + secret config
+│   └── static/         # frontend (index.html, app.js, style.css, logo.png)
+├── data/               # face DB + outputs — git-ignored, never committed
+├── Dockerfile
+└── requirements.txt
 ```
+
+## License
+
+Source code: **MIT** — see [LICENSE](LICENSE).
+
+⚠️ **The model is not MIT.** MaskIT uses the InsightFace `buffalo_l` model pack,
+which upstream releases for **non-commercial research purposes only**. Commercial
+use needs a separate license from InsightFace. Swap in your own model via
+`FaceAnalysis(...)` in `backend/face_engine.py` to avoid this.
+
+Other dependencies keep their own licenses (FastAPI, OpenCV, Pillow, NumPy,
+ONNX Runtime, InsightFace).
+
+## Legal
+
+Blur your own face, or get consent from people whose faces you process. Face data
+is biometric data under laws like GDPR — this is a tool, and using it on someone
+without their agreement may be unlawful where they live.
