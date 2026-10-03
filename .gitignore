@@ -15,3 +15,6 @@ Thumbs.db
 .idea/
 # Kilo agent config
 .kilo/
+
+# session signing key
+data/session_secret

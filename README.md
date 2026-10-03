@@ -29,6 +29,21 @@ or kids only.
 3. Open **http://localhost:8000** in your browser
    (the webcam requires `localhost` or HTTPS).
 
+   Running over plain HTTP on a LAN IP? Set `MASKIT_SECURE_COOKIES=0`,
+   otherwise the browser drops the session cookie and each request looks
+   like a brand-new visitor (so face memories vanish between clicks).
+
+## Privacy model
+- Photos are processed in memory on the server running the app and are never
+  written to disk. Processed results are deleted after 1 hour.
+- Enrolled faces are **per-visitor**, stored under a signed session cookie
+  (`HttpOnly`, `SameSite=Lax`), so people sharing the URL don't share a face
+  database. Deleting your browser cookie removes your access to them.
+- There is **no account or password**. Anyone who can reach the URL can enroll
+  faces and process photos. Don't put it on a public IP you care about without
+  adding auth in front.
+- Face embeddings are biometric data — get consent, and check your local law.
+
 ## How to use
 1. Enter a name → **Start camera** → **Capture & learn** (5 frames).
 2. Upload a photo, pick an **Effect** and **Who**, click **Process**.
